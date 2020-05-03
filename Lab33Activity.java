@@ -14,6 +14,7 @@ import java.util.Random;
 import java.util.Scanner;
 
 import static java.lang.Math.abs;
+import static java.lang.Math.round;
 
 class Equation{
     int a,b,c,d,y;
@@ -56,14 +57,45 @@ class Lab3_3 {
         return progeny;
     }
 
-    static void genetic_algorithm(Equation equation, int n, TextView textView) {
-        int[][] population = new int[n][4];
-        int[][] parents = new int[n][4]; //батьки, що сформують нову популяцію
-        int[][] newPopulation = new int[n][4];
+    static float[] linspace(float start, float end, int n) {
+        float[] arr = new float[n];
+        float current = start;
+        float step = (end - start) / ((float)n - 1);
+        for (int i = 0; i < n; ++i) {
+            arr[i] = current; current += step;
+        }
+        return arr;
+    }
+    static  int index_of_min_elem(int[] arr){
+        int min = arr[0], imin=0, i;
+        for(i=1; i<arr.length; ++i)
+            if (arr[i]<min){min=arr[i]; imin=i;}
+        return imin;
+    }
 
-        float[] reversedFitnessArr = new float[n];
+    static void additional_task(Equation equation, int poplationSize, TextView textView) {
+        float minMutations = 5.f, maxMutations = 30.f; //% мутацій: мінімальний, максимальний,
+        int n = 5; // к-сть різних значань мутацій
+        float[] mutationsValues = linspace(minMutations, maxMutations, n); //масив значень мутацій
+        int[] generationsNumbers = new int[n]; //масив к-сті поколінь які знадобились для вирішення завдання при заданому % мутацій
+
+        for (int i = 0; i < n; ++i) {
+            generationsNumbers[i] = genetic_algorithm(equation, poplationSize, mutationsValues[i], textView);
+        }
+        textView.append("значення % мутацій: "+Arrays.toString(mutationsValues)+"\nзначення к-сті поколінь: "+Arrays.toString(generationsNumbers)+"\n");
+        int imin = index_of_min_elem(generationsNumbers);
+        textView.append("Оптимальний % мутацій: "+mutationsValues[imin]+"\nК-сть поколінь: "+generationsNumbers[imin]+"\n");
+    }
+
+    //poplationSize - розмір популяції, mutations - відсоток мутацій
+    static int genetic_algorithm(Equation equation, int poplationSize, float mutations, TextView textView) {
+        int[][] population = new int[poplationSize][4]; //poplationSize-розмір популяції
+        int[][] parents = new int[poplationSize][4]; //батьки, що сформують нову популяцію
+        int[][] newPopulation = new int[poplationSize][4];
+
+        float[] reversedFitnessArr = new float[poplationSize];
         float reversedFitnessArrSum;
-        float[] probabilityArr = new float[n];
+        float[] probabilityArr = new float[poplationSize];
         int i, j, fitnessValue, gen = 1;
         Random random = new Random();
         int rnd1, rnd2, rnd3; //випадкові числа
@@ -79,7 +111,7 @@ class Lab3_3 {
             textView.append("популяція:\n" + array_to_string(population)+"\n");
 
             reversedFitnessArrSum = 0.f;
-            for (i = 0; i < n; ++i) {
+            for (i = 0; i < poplationSize; ++i) {
                 fitnessValue = equation.fitness_function(population[i]);
                 if (fitnessValue == 0) {
                     calculationComplete = true;
@@ -95,18 +127,18 @@ class Lab3_3 {
 
             textView.append("Значення ф-цї пристосованості: " + Arrays.toString(reversedFitnessArr) + "    сума: " + reversedFitnessArrSum+"\n");
 
-            for (i = 0; i < n; ++i) //формування ймовірностей для кожної особи
+            for (i = 0; i < poplationSize; ++i) //формування ймовірностей для кожної особи
                 probabilityArr[i] = reversedFitnessArr[i] / reversedFitnessArrSum;
             textView.append("ймовірності: " + Arrays.toString(probabilityArr)+"\n");
 
             //формування масиву сум ймовірностей, значення зростають, останне значення = 1
-            for (i = 1; i < n; ++i)
+            for (i = 1; i < poplationSize; ++i)
                 probabilityArr[i] += probabilityArr[i - 1];
             textView.append("суми ймовірностей: " + Arrays.toString(probabilityArr)+"\n");
 
-            for (i = 0; i < n; ++i) { //i-номер батька
+            for (i = 0; i < poplationSize; ++i) { //i-номер батька
                 randomValue = random.nextFloat();
-                for (j = 0; j < n; ++j)//знаходження батька випадково враховуючи вірогідності
+                for (j = 0; j < poplationSize; ++j)//знаходження батька випадково враховуючи вірогідності
                     if (randomValue < probabilityArr[j]) {
                         parents[i] = population[j];
                         break;
@@ -114,24 +146,37 @@ class Lab3_3 {
             }
             textView.append("батьки:\n" + array_to_string(parents)+"\n");
 
-            for (i = 0; i < n; i += 2) {//схрещювання
+            for (i = 0; i < poplationSize; i += 2) {//схрещювання
                 newPopulation[i] = crossing(parents[i], parents[i + 1]);
                 newPopulation[i + 1] = crossing(parents[i], parents[i + 1]);
             }
             population = newPopulation;
 
-            for (i = 0; i < 3; ++i) { //мутація
-                rnd1 = random.nextInt(n);
-                rnd2 = random.nextInt(4);
-                rnd3 = random.nextInt(5) - 2;
+            int nMutations= round(4.f*poplationSize* mutations/100.f);
+            for (i = 0; i < nMutations; ++i) { //мутація
+                rnd1 = random.nextInt(poplationSize); //номер особи
+                rnd2 = random.nextInt(4); //номер гену
+                rnd3 = random.nextInt(5) - 2; //значення мутації [-2; 2]
                 population[rnd1][rnd2] += rnd3;
             }
             textView.append("--------------------------------------------------\n");
             //scanner.next();
         }
+        return gen-1;
+
     }
 }
 public class Lab33Activity extends AppCompatActivity {
+    Equation generate_equation(EditText equationCoeffEditText){
+        String[] coeffStr = equationCoeffEditText.getText().toString().split(" ");
+        int a,b,c,d,y;
+        a=Integer.parseInt(coeffStr[0]);
+        b=Integer.parseInt(coeffStr[1]);
+        c=Integer.parseInt(coeffStr[2]);
+        d=Integer.parseInt(coeffStr[3]);
+        y=Integer.parseInt(coeffStr[4]);
+        return new Equation(a,b,c,d,y);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -141,25 +186,30 @@ public class Lab33Activity extends AppCompatActivity {
         final EditText equationCoeffEditText = (EditText)findViewById(R.id.equationCoeffEditText);
         final EditText populationSizeEditText = (EditText)findViewById(R.id.populationSizeEditText);
         Button geneticAlgorithmButton = (Button)findViewById(R.id.geneticAlgorithmButton);
+        Button additionalTaskButton = (Button)findViewById(R.id.additionalTaskButton);
+
         final TextView geneticAlgorithmTextView = (TextView) findViewById(R.id.geneticAlgorithmTextView);
         geneticAlgorithmTextView.setMovementMethod(new ScrollingMovementMethod());
         geneticAlgorithmButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 geneticAlgorithmTextView.setText("");
-                String[] coeffStr = equationCoeffEditText.getText().toString().split(" ");
-                int a,b,c,d,y;
-                a=Integer.parseInt(coeffStr[0]);
-                b=Integer.parseInt(coeffStr[1]);
-                c=Integer.parseInt(coeffStr[2]);
-                d=Integer.parseInt(coeffStr[3]);
-                y=Integer.parseInt(coeffStr[4]);
-                Equation equation = new Equation(a,b,c,d,y);
-
+                Equation equation = generate_equation(equationCoeffEditText);
                 int n = Integer.parseInt(populationSizeEditText.getText().toString());
-                Lab3_3.genetic_algorithm(equation,n,geneticAlgorithmTextView);
+                Lab3_3.genetic_algorithm(equation,n,10.f, geneticAlgorithmTextView);
+
             }
         });
+        additionalTaskButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                geneticAlgorithmTextView.setText("");
+                Equation equation = generate_equation(equationCoeffEditText);
+                int n = Integer.parseInt(populationSizeEditText.getText().toString());
+                Lab3_3.additional_task(equation, n, geneticAlgorithmTextView);
+            }
+        });
+
 
     }
 }
